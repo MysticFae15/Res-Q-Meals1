@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Res-Q Food App</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css" />
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background-color: #fff0f5;
+    }
+
+    .header {
+      background-color: #ffe6f0;
+      text-align: center;
+      padding: 20px 10px;
+      color: #333;
+    }
+
+    .header h1 {
+      margin: 0;
+      font-size: 2.5em;
+      font-weight: bold;
+    }
+
+    .header p {
+      margin: 5px 0 0;
+      font-size: 1.2em;
+      font-style: italic;
+    }
+
+    .container {
+      display: flex;
+      height: calc(100vh - 100px);
+    }
+
+    .sidebar {
+      width: 20%;
+      padding: 10px;
+      overflow-y: auto;
+      background-color: #fff8fc;
+    }
+
+    .left {
+      border-right: 1px solid #ccc;
+    }
+
+    .map-section {
+      flex: 1;
+      position: relative;
+    }
+
+    #map {
+      height: 100%;
+      width: 100%;
+    }
+
+    #donation-form {
+      position: absolute;
+      top: 100px;
+      right: 30px;
+      z-index: 1000;
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 0 15px rgba(0,0,0,0.2);
+      padding: 15px;
+      width: 300px;
+    }
+
+    #donation-form select,
+    #donation-form input,
+    #donation-form button {
+      width: 100%;
+      margin-top: 5px;
+      padding: 6px;
+      font-size: 14px;
+    }
+
+    #typeFilter {
+      margin-top: 10px;
+      padding: 6px;
+      width: 100%;
+    }
+
+    .leaflet-control-zoom {
+      top: 100px !important;
+      left: 10px !important;
+      transform: none !important;
+    }
+
+    #confirmation-popup, #thankYouPopup {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: white;
+      padding: 20px 30px;
+      border-radius: 12px;
+      box-shadow: 0px 4px 15px rgba(0,0,0,0.2);
+      z-index: 2000;
+      display: none;
+      text-align: center;
+      font-size: 18px;
+      animation: fadeIn 0.5s ease-in-out;
+    }
+
+    #confirmation-popup button, #thankYouPopup button {
+      margin: 10px;
+      padding: 10px 20px;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translate(-50%, -60%); }
+      to { opacity: 1; transform: translate(-50%, -50%); }
+    }
+  </style>
+</head>
+<body>
+  <!-- 🔼 Header Section -->
+  <div class="header">
+    <h1>Res-Q Food App</h1>
+    <p>~From kitchen to kindness~</p>
+  </div>
+
+  <div class="container">
+    <!-- 🔹 Left Sidebar -->
+    <div class="sidebar left">
+      <label for="typeFilter"><strong>Filter by Type</strong></label>
+      <select id="typeFilter">
+        <option value="All">Show All</option>
+        <option value="Restaurant">Restaurants</option>
+        <option value="Orphanage">Orphanages</option>
+        <option value="Donation Bank">Donation Banks</option>
+      </select>
+      <hr>
+    </div>
+
+    <!-- 🗺️ Map Section -->
+    <div class="map-section">
+      <div id="map"></div>
+
+      <!-- ✅ Add Donation Form -->
+      <div id="donation-form">
+        <h4>Add Donation 🍱</h4>
+
+        <select id="restaurantName">
+          <option value="">-- Select Restaurant --</option>
+          <option value="Hotel Saravana Bhavan">Hotel Saravana Bhavan</option>
+          <option value="A2B (Adyar Ananda Bhavan)">A2B (Adyar Ananda Bhavan)</option>
+          <option value="Sangeetha Veg Restaurant">Sangeetha Veg Restaurant</option>
+          <option value="Hot Chips">Hot Chips</option>
+          <option value="SS Hyderabad Biryani">SS Hyderabad Biryani</option>
+          <option value="Hotel Buhari">Hotel Buhari</option>
+          <option value="Thalappakatti">Thalappakatti</option>
+          <option value="The Cascade">The Cascade</option>
+          <option value="KFC">KFC</option>
+          <option value="Domino's Pizza">Domino's Pizza</option>
+        </select>
+
+        <select id="donationMode">
+          <option value="">-- Mode of Donation --</option>
+          <option value="Orphanages">Orphanages</option>
+          <option value="Food Banks">Food Banks</option>
+          <option value="NGOs">NGOs</option>
+        </select>
+
+        <select id="recipientList">
+          <option value="">-- Select Recipient --</option>
+        </select>
+
+        <input type="number" id="lat" placeholder="Latitude" step="any" required />
+        <input type="number" id="lng" placeholder="Longitude" step="any" required />
+        <input type="text" id="address" placeholder="Auto-filled Address" readonly />
+
+        <button onclick="submitDonation()">Donate</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ✅ Confirmation Popup -->
+  <div id="confirmation-popup">
+    <p>Confirm your donation?</p>
+    <button onclick="confirmDonation(true)">Yes</button>
+    <button onclick="confirmDonation(false)">No</button>
+  </div>
+
+  <!-- ✅ Thank You Popup -->
+  <div id="thankYouPopup">
+    🎉 Thank you for your donation! You made someone’s day! 🎉
+  </div>
+
+  <!-- JS Libraries -->
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.min.js"></script>
+
+  <script>
+    const map = L.map('map').setView([13.0860, 80.2209], 15);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    // 🔹 Vars from Snippet 1 integrated
+    let currentRoute = null;
+    let routingControl = null; // Instead of polyline
+
+    function getIcon(type) {
+      if (type === "Restaurant") return L.divIcon({ html: '☕', iconSize: [20, 20] });
+      if (type === "Donation Bank") return L.divIcon({ html: '✨', iconSize: [20, 20] });
+      if (type === "Orphanage") return L.divIcon({ html: '🍀', iconSize: [20, 20] });
+      return L.divIcon({ html: '📍', iconSize: [20, 20] });
+    }
+
+    function reverseGeocode(lat, lng) {
+      fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`)
+        .then(res => res.json())
+        .then(data => {
+          document.getElementById("address").value = data.display_name || "Unknown Address";
+        })
+        .catch(() => {
+          document.getElementById("address").value = "Unable to fetch address";
+        });
+    }
+
+    function setupLatLngWatchers() {
+      const latInput = document.getElementById("lat");
+      const lngInput = document.getElementById("lng");
+
+      function update() {
+        const lat = parseFloat(latInput.value);
+        const lng = parseFloat(lngInput.value);
+        if (!isNaN(lat) && !isNaN(lng)) reverseGeocode(lat, lng);
+      }
+      latInput.addEventListener("change", update);
+      lngInput.addEventListener("change", update);
+    }
+    setupLatLngWatchers();
+
+    let allMarkers = [];
+
+    function renderMarkers(filteredType) {
+      allMarkers.forEach(m => map.removeLayer(m));
+      allMarkers = [];
+
+      fetch("/locations")
+        .then(r => r.json())
+        .then(locations => {
+          locations.forEach(loc => {
+            if (filteredType !== "All" && loc.type !== filteredType) return;
+            const marker = L.marker([loc.lat, loc.lng], { icon: getIcon(loc.type) })
+              .addTo(map)
+              .bindPopup(`<b>${loc.name}</b><br>${loc.type}`);
+            allMarkers.push(marker);
+          });
+        });
+    }
+    renderMarkers("All");
+
+    document.getElementById("typeFilter").addEventListener("change", (e) => {
+      renderMarkers(e.target.value);
+    });
+
+    function submitDonation() {
+      // 🔹 Define route before confirmation
+      const restaurantLatLng = L.latLng(13.0860, 80.2209);
+      const donationLatLng = L.latLng(13.05, 80.21);
+      currentRoute = { from: restaurantLatLng, to: donationLatLng };
+
+      document.getElementById("confirmation-popup").style.display = "block";
+    }
+
+    function confirmDonation(confirmed) {
+      document.getElementById("confirmation-popup").style.display = "none";
+      if (!confirmed) {
+        currentRoute = null;
+        return;
+      }
+
+      // ✅ Show Thank You popup
+      const popup = document.getElementById("thankYouPopup");
+      popup.style.display = "block";
+
+      // 🎉 Confetti animation
+      confetti({
+        particleCount: 200,
+        spread: 100,
+        origin: { y: 0.6 }
+      });
+
+      // Auto hide after 3s
+      setTimeout(() => {
+        popup.style.display = "none";
+      }, 3000);
+
+      // 🔹 Fire donation request
+      const name = document.getElementById("restaurantName").value;
+      const lat = parseFloat(document.getElementById("lat").value);
+      const lng = parseFloat(document.getElementById("lng").value);
+      const mode = document.getElementById("donationMode").value;
+      const recipient = document.getElementById("recipientList").value;
+      const address = document.getElementById("address").value;
+
+      fetch('http://127.0.0.1:5000/donate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          restaurantName: name,
+          lat: lat,
+          lng: lng,
+          address: address,
+          mode: mode,
+          recipient: recipient
+        })
+      }).catch(() => {});
+
+      // ✅ Draw REAL driving route instead of fake polyline
+      if (currentRoute) {
+        if (routingControl) {
+          map.removeControl(routingControl);
+        }
+        routingControl = L.Routing.control({
+          waypoints: [
+            currentRoute.from,
+            currentRoute.to
+          ],
+          routeWhileDragging: false,
+          show: false,
+          addWaypoints: false,
+          draggableWaypoints: false,
+          fitSelectedRoutes: true,
+          lineOptions: {
+            styles: [{ color: 'blue', weight: 5 }]
+          }
+        }).addTo(map);
+      }
+    }
+
+    function updateRecipientOptions() {
+      const mode = document.getElementById("donationMode").value;
+      const recipientList = document.getElementById("recipientList");
+      const options = {
+        "Orphanages": ["Little Flower Orphanage","St. Joseph’s Home","Children’s Haven"],
+        "Food Banks": ["Feeding India – Anna Nagar","Chennai Food Bank"],
+        "NGOs": ["Goonj","Udavum Karangal","Smile Foundation"]
+      };
+
+      recipientList.innerHTML = "<option value=''>-- Select Recipient --</option>";
+      if (options[mode]) {
+        options[mode].forEach(item => {
+          const opt = document.createElement("option");
+          opt.value = item;
+          opt.textContent = item;
+          recipientList.appendChild(opt);
+        });
+      }
+    }
+    document.addEventListener("DOMContentLoaded", () => {
+      document.getElementById("donationMode").addEventListener("change", updateRecipientOptions);
+    });
+
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition((pos) => {
+        const userLat = pos.coords.latitude;
+        const userLng = pos.coords.longitude;
+        L.marker([userLat, userLng]).addTo(map).bindPopup("📍 You are here").openPopup();
+        map.setView([userLat, userLng], 15);
+        document.getElementById("lat").value = userLat;
+        document.getElementById("lng").value = userLng;
+        reverseGeocode(userLat, userLng);
+      });
+    }
+  </script>
+</body>
+</html>
